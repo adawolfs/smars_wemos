@@ -4,12 +4,13 @@
 #include <WebSocketsServer.h>
 #include <wifiAuth.h>
 #define USE_SERIAL Serial
-
+#define MOVE_DELAY 100
 // Create a webpage with a JS WS Client implementation
 // This is stored at flash memory, ref: https://arduino.stackexchange.com/questions/77770/confuse-about-progmem-and-r
 char webpage[] PROGMEM = R"=====(
 <html>
 <head>
+  <title>SMARS Controller</title>
   <script>
     var connection = new WebSocket('ws://' + location.hostname + ':81/', ['arduino']);
     connection.onopen = function () {
@@ -30,17 +31,118 @@ char webpage[] PROGMEM = R"=====(
         connection.send("-")
     }
   </script>
+  <style>
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 1.5em;
+      text-align: center;
+    }
+    input[type="button"]{
+      background-color: #ffffff;
+      color: #000000;
+      font-size: 1.5em;
+      padding: 10px;
+      margin: 10px;
+      width: 100px;
+      border-radius: 10px;
+      border: 1px solid #000000;
+    }
+    input[type="button"]:focus {
+        background-color: red;
+    }
+  </style>
 </head>
 
-<body>LED Control:<br /><br />
-  <input type="button" value="ON" onclick="sendON();" />
-  <input type="button" value="OFF" onclick="sendOFF();" />
+<body>
+<h2>SMARS Control:</h2>
+<br/>
+<br/>
+<table>
+  <tr>
+    <td></td>
+    <td><input type="button" value="&uarr;" onclick="connection.send('U')" /></td>
+    <td></td>
+    <td width="100px"></td>
+    <td><input type="button" value="ON" onclick="sendON();" /></td>
+  </tr>
+  <tr>
+    <td><input type="button" value="&larr;" onclick="connection.send('L')" /></td>
+    <td></td>
+    <td><input type="button" value="&rarr;" onclick="connection.send('R')" /></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td><input type="button" value="&darr;" onclick="connection.send('D')" /></td>
+    <td></td>
+    <td></td>
+    <td><input type="button" value="OFF" onclick="sendOFF();" /></td>
+  </tr>
+</table>
+  
+  
 </body>
 </html>
 )=====";
 
 ESP8266WebServer server(80);
 WebSocketsServer webSocket(81);
+
+
+
+void up()
+{
+  // Motor 1
+  digitalWrite(D5, 1);
+  digitalWrite(D6, 0);
+  // Motor 2
+  digitalWrite(D7, 1);
+  digitalWrite(D8, 0);
+}
+
+void down()
+{
+  // Motor 1
+  digitalWrite(D5, 0);
+  digitalWrite(D6, 1);
+  // Motor 2
+  digitalWrite(D7, 0);
+  digitalWrite(D8, 1);
+}
+
+void right()
+{
+  // Motor 1
+  digitalWrite(D5, 1);
+  digitalWrite(D6, 0);
+  // Motor 2
+  digitalWrite(D7, 0);
+  digitalWrite(D8, 1);
+}
+
+void left()
+{
+  // Motor 1
+  digitalWrite(D5, 0);
+  digitalWrite(D6, 1);
+  // Motor 2
+  digitalWrite(D7, 1);
+  digitalWrite(D8, 0);
+}
+
+void stop()
+{
+  // Motor 1
+  digitalWrite(D5, 0);
+  digitalWrite(D6, 0);
+  // Motor 2
+  digitalWrite(D7, 0);
+  digitalWrite(D8, 0);
+}
+
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 {
@@ -64,24 +166,47 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 
     if (payload[0] == '+')
     {
-      //LED ON
+      // LED ON
       digitalWrite(LED_BUILTIN, 0);
     }
     if (payload[0] == '-')
     {
-      //LED OFF
       digitalWrite(LED_BUILTIN, 1);
     }
-
+    if (payload[0] == 'U')
+    {
+      up();
+      delay(MOVE_DELAY);
+      stop();
+    }
+    if (payload[0] == 'D')
+    {
+      down();
+      delay(MOVE_DELAY);
+      stop();
+    }
+    if (payload[0] == 'R')
+    {
+      right();
+      delay(MOVE_DELAY);
+      stop();
+    }
+    if (payload[0] == 'L')
+    {
+      left();
+      delay(MOVE_DELAY);
+      stop();
+    }
     break;
   }
+
 }
 
 // Load the basic led control webpage
 void handleRoot()
 {
   digitalWrite(LED_BUILTIN, 1);
-  server.send_P(200, "text/plain", webpage);
+  server.send_P(200, "text/html", webpage);
   digitalWrite(LED_BUILTIN, 0);
   delay(500);
 }
@@ -110,6 +235,10 @@ void handleNotFound()
 void setup(void)
 {
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(D5, OUTPUT);
+  pinMode(D6, OUTPUT);
+  pinMode(D7, OUTPUT);
+  pinMode(D8, OUTPUT);
   digitalWrite(LED_BUILTIN, 0);
 
   USE_SERIAL.begin(115200);
